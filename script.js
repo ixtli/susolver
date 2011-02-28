@@ -16,6 +16,8 @@ const puzzleWidth = 9;
 const puzzleHeight = 9;
 const regionsWide = 3;
 const regionsHigh = 3;
+const regionWidth = puzzleWidth / regionsWide;
+const regionHeight = puzzleHeight / regionsHigh;
 
 var puzzle = new Array(9 * 9);
 var puzzleLength = puzzle.length;
@@ -226,8 +228,6 @@ function init()
     loadPuzzles();
     
     resetPuzzle(puzzles["puz-100"], " ", 9, 9);
-    
-    console.log(regionUnique( 1, 0));
 }
 
 function resetPuzzle(p, token)
@@ -349,6 +349,7 @@ function mousedownHandler(evt)
     updateSquare(oldx, oldy);
     
     // Do work
+    // console.log("Selected index:" + ind);
     
     return false;
 }
@@ -385,24 +386,22 @@ function columnUnique(val, column)
 function regionUnique(val, region)
 {
     // Regions are numbered from left to right, top to bottom, 0 - 8
-    
     var xstart = region % regionsWide;
-    var ystart = (region - xstart) / regionsHigh;
     
-    var startIndex = xstart * (puzzleWidth / regionsHigh);
-    startIndex += puzzleWidth * (regionsHigh - 1);
+    var startIndex = xstart * regionWidth;
+    startIndex += ((region - xstart) / regionsHigh)*(puzzleWidth * regionsHigh);
     
-    var max = startIndex + puzzleWidth / regionsWide;
+    var max = startIndex + regionWidth;
     for (var i = startIndex; i < max; i++)
         if (puzzle[i] == val) return i;
     
     startIndex += puzzleWidth;
-    max = startIndex + puzzleWidth / regionsWide;
+    max = startIndex + regionWidth;
     for (var i = startIndex; i < max; i++)
         if (puzzle[i] == val) return i;
     
     startIndex += puzzleWidth;
-    max = startIndex + puzzleWidth / regionsWide;
+    max = startIndex + regionWidth;
     for (var i = startIndex; i < max; i++)
         if (puzzle[i] == val) return i;
     
