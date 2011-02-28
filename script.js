@@ -11,15 +11,19 @@ var ctx = null;
 var mouseX = 0, mouseY = 0;
 
 // App state defaults
-var puzzleWidth = 10;
-var puzzleHeight = 10;
+// N.B.: I do NOT know this will work if the puzzle isn't square.
+const puzzleWidth = 9;
+const puzzleHeight = 9;
+const regionsWide = 3;
+const regionsHigh = 3;
 
-var puzzle = null;
-var puzzleLength = 0;
+var puzzle = new Array(9 * 9);
+var puzzleLength = puzzle.length;
+
 var selectionIndex = 0;
 var hilightIndex = 0;
 
-var noValue = "-";
+const noValue = -1;
 
 var puzzles = [];
 
@@ -217,24 +221,38 @@ function init()
     ctx.fillStyle = "black";
     ctx.font = "12pt sans-serif";
     
-    
     configureEventBindings();
     
     loadPuzzles();
+    
     resetPuzzle(puzzles["puz-100"], " ", 9, 9);
+    
+    console.log(regionUnique( 1, 0));
 }
 
-function resetPuzzle(p, token, w, h)
+function resetPuzzle(p, token)
 {
     if (puzzle != null) delete puzzle;
     
-    puzzleWidth = w;
-    puzzleHeight = h;
     selectionIndex = 0;
     hilightIndex = 0;
     
-    puzzle = p.split(token);
-    puzzleLength = puzzle.length;
+    var tmp = p.split(token);
+    var val = 0;
+    
+    for (var i = 0; i < puzzleLength; i++)
+    {
+        val = parseInt(tmp[i]);
+        
+        if (isNaN(val) == true)
+            puzzle[i] = noValue;
+        else
+            puzzle[i] = val;
+        
+    }
+    
+    // Explicit garbage collection
+    delete tmp;
     
     updateMap();
 }
@@ -354,3 +372,40 @@ function mouseHandler(evt)
     return false;
 }
 
+function rowUnique(val, row)
+{
+    
+}
+
+function columnUnique(val, column)
+{
+    
+}
+
+function regionUnique(val, region)
+{
+    // Regions are numbered from left to right, top to bottom, 0 - 8
+    
+    var xstart = region % regionsWide;
+    var ystart = (region - xstart) / regionsHigh;
+    
+    var startIndex = xstart * (puzzleWidth / regionsHigh);
+    startIndex += puzzleWidth * (regionsHigh - 1);
+    
+    var max = startIndex + puzzleWidth / regionsWide;
+    for (var i = startIndex; i < max; i++)
+        if (puzzle[i] == val) return i;
+    
+    startIndex += puzzleWidth;
+    max = startIndex + puzzleWidth / regionsWide;
+    for (var i = startIndex; i < max; i++)
+        if (puzzle[i] == val) return i;
+    
+    startIndex += puzzleWidth;
+    max = startIndex + puzzleWidth / regionsWide;
+    for (var i = startIndex; i < max; i++)
+        if (puzzle[i] == val) return i;
+    
+    // Not found
+    return -1;
+}
