@@ -19,6 +19,19 @@ var puzzleLength = 0;
 var selectionIndex = 0;
 var hilightIndex = 0;
 
+var noValue = "-";
+
+var puzzle1 =
+"7 8 1 6 - 2 9 - 5 \
+9 - 2 7 1 - - - - \
+- - 6 8 - - - 1 2 \
+2 - - 3 - - 8 5 1 \
+- 7 3 5 - - - - 4 \
+- - 8 - - 9 3 6 - \
+1 9 - - - 7 - 8 - \
+8 6 7 - - 3 4 - 9 \
+- - 5 - - - 1 - -";
+
 function init()
 {
     // Get the canvas element to display the game in.
@@ -35,18 +48,20 @@ function init()
     
     configureEventBindings();
     
-    resetPuzzle();
+    resetPuzzle(puzzle1, " ", 9, 9);
 }
 
-function resetPuzzle()
+function resetPuzzle(p, token, w, h)
 {
     if (puzzle != null) delete puzzle;
     
-    puzzle = new Array(puzzleWidth * puzzleHeight);
-    puzzleLength = puzzle.length;
+    puzzleWidth = w;
+    puzzleHeight = h;
+    selectionIndex = 0;
+    hilightIndex = 0;
     
-    for (var i = puzzleLength - 1; i >= 0; i--)
-        puzzle[i] = -1;
+    puzzle = p.split(token);
+    puzzleLength = puzzle.length;
     
     updateMap();
 }
@@ -74,7 +89,7 @@ function updateMap()
             ctx.strokeRect(border + x * (squareSize + gap),
                 border + y * (squareSize + gap), squareSize, squareSize);
             
-            if (puzzle[ind] < 0) continue;
+            if (puzzle[ind] == noValue) continue;
             
             len = ctx.measureText(puzzle[ind]).width;
             ctx.fillText(puzzle[ind],
@@ -111,7 +126,7 @@ function updateSquare(x,y)
     ctx.strokeRect(border + x * (squareSize + gap),
         border + y * (squareSize + gap), squareSize, squareSize);
     
-    if (puzzle[ind] < 0) return true;
+    if (puzzle[ind] == noValue) return true;
     
     var len = ctx.measureText(puzzle[ind]).width;
     ctx.fillText(puzzle[ind],
