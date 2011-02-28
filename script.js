@@ -18,9 +18,8 @@ const regionsWide = 3;
 const regionsHigh = 3;
 const regionWidth = puzzleWidth / regionsWide;
 const regionHeight = puzzleHeight / regionsHigh;
-
-var puzzle = new Array(9 * 9);
-var puzzleLength = puzzle.length;
+const puzzleLength = puzzleWidth * puzzleHeight;
+const numberMax = 9;
 
 var selectionIndex = 0;
 var hilightIndex = 0;
@@ -28,6 +27,7 @@ var hilightIndex = 0;
 const noValue = -1;
 
 var puzzles = [];
+var currentPuzzle = null;
 
 function loadPuzzles ()
 {
@@ -209,6 +209,194 @@ function loadPuzzles ()
 
 }
 
+function SudokuPuzzle (p, token)
+{
+    this.puzzle = new Array(puzzleWidth * puzzleHeight);
+    
+    this.columnDomain = new Array(puzzleWidth);
+    this.rowDomain = new Array(puzzleHeight);
+    this.regionDomain = new Array(regionsWide * regionsHigh);
+    
+    return this.init(p, token);
+}
+
+SudokuPuzzle.prototype = {
+    
+    init: function (p, token)
+    {
+        var puzzle = this.puzzle;
+        
+        var tmp = p.split(token);
+        var val = 0;
+        
+        if (tmp.length != puzzleLength)
+        {
+            if (console.log != "undefined")
+                console.log("Puzzle description corrupted.");
+            
+            return false;
+        }
+        
+        // Init puzzle
+        for (var i = puzzleLength - 1; i >= 0; i--)
+            puzzle[i] = noValue;
+        
+        // Init column domains
+        var obj = this.columnDomain;
+        for (var i = obj.length - 1; i >= 0; i--)
+        {
+            obj[i] = new Array(numberMax);
+            val = obj[i];
+            for (var j = 8; j >= 0; j--)
+                val[j] = j + 1;
+        }
+        
+        // Init row domains
+        var obj = this.rowDomain;
+        for (var i = obj.length - 1; i >= 0; i--)
+        {
+            obj[i] = new Array(numberMax);
+            val = obj[i];
+            for (var j = 8; j >= 0; j--)
+                val[j] = j + 1;
+        }
+        
+        // Init region domains
+        var obj = this.columnDomain;
+        for (var i = obj.length - 1; i >= 0; i--)
+        {
+            obj[i] = new Array(numberMax);
+            val = obj[i];
+            for (var j = 8; j >= 0; j--)
+                val[j] = j + 1;
+        }
+        
+        for (var i = 0; i < puzzleLength; i++)
+        {
+            val = parseInt(tmp[i]);
+            
+            if (isNaN(val) == true)
+                puzzle[i] = noValue;
+            else
+                puzzle[i] = val;
+        }
+        
+        // Explicit garbage collection
+        delete tmp;
+        
+        return true;
+    },
+    
+    placeValue: function (val, x, y)
+    {
+        
+    },
+    
+    statelessPlaceValue: function (val, x, y, checkState)
+    {
+        if (this.statelessRowUnique(val, y) > noValue) return noValue;
+        if (this.statelessColumnUnique(val, x) > noValue) return noValue;
+        
+        var region = x % regionWidth;
+        region += (y % regionHeight) * regionWidth;
+        if (this.statelessRegionUnique(val, region) > noValue) return noValue;
+        
+        if (checkState == true)
+        {
+            // Check the state, and throw an error if the state says the value
+            // is invalid for any reason.
+            if (this.rowUnique(val, y) == false)
+            {
+                if (console.log != "undefined") console.log("Inconsistency");
+                return false;
+            }
+            
+            if (this.columnUnique(val, x) == false)
+            {
+                if (console.log != "undefined") console.log("Inconsistency");
+                return false;
+            }
+            
+            if (this.regionUnique(val, region) == false)
+            {
+                if (console.log != "undefined") console.log("Inconsistency");
+                return false;
+            }
+        }
+        
+        this.puzzle[x + y * puzzleWidth] = val;
+        updateSquare(x,y);
+        
+        return true;
+    },
+    
+    rowUnique: function (val, row)
+    {
+        
+        return true;
+    },
+    
+    columnUnique: function (val, column)
+    {
+        
+        return true;
+    },
+    
+    regionUnique: function (val, region)
+    {
+        
+        return true;
+    },
+    
+    statelessRowUnique: function (val, row)
+    {
+        var puzzle = this.puzzle;
+        var max = puzzleWidth * row + puzzleWidth;
+        for (var i = puzzleWidth * row; i < max; i++)
+            if (puzzle[i] == val) return i;
+        return noValue;
+    },
+    
+    statelessColumnUnique: function (val, column)
+    {
+        var puzzle = this.puzzle;
+        for (var i = puzzleHeight - 1; i >= 0; i--)
+            if (puzzle[i * puzzleWidth + column] == val)
+                return (i * puzzleWidth + column);
+            
+        return noValue;
+    },
+    
+    statelessRegionUnique: function (val, region)
+    {
+        var puzzle = this.puzzle;
+        
+        // Regions are numbered from left to right, top to bottom, 0 - 8
+        var xstart = region % regionsWide;
+        
+        var startIndex = xstart * regionWidth;
+        startIndex += ((region - xstart) / regionsHigh)*(puzzleWidth * regionsHigh);
+        
+        var max = startIndex + regionWidth;
+        for (var i = startIndex; i < max; i++)
+            if (puzzle[i] == val) return i;
+        
+        startIndex += puzzleWidth;
+        max = startIndex + regionWidth;
+        for (var i = startIndex; i < max; i++)
+            if (puzzle[i] == val) return i;
+        
+        startIndex += puzzleWidth;
+        max = startIndex + regionWidth;
+        for (var i = startIndex; i < max; i++)
+            if (puzzle[i] == val) return i;
+        
+        // Not found
+        return noValue;
+    },
+    
+}
+
 function init()
 {
     // Get the canvas element to display the game in.
@@ -229,33 +417,19 @@ function init()
     
     resetPuzzle(puzzles["puz-100"], " ", 9, 9);
     
-    selectionIndex = rowUnique(9,8);
-    updateMap();
+    currentPuzzle.statelessPlaceValue(2,0,0,true);
+    currentPuzzle.statelessPlaceValue(3,3,3,true);
 }
 
 function resetPuzzle(p, token)
 {
-    if (puzzle != null) delete puzzle;
+    if (currentPuzzle != null)
+        delete currentPuzzle;
+    
+    currentPuzzle = new SudokuPuzzle(p, token);
     
     selectionIndex = 0;
     hilightIndex = 0;
-    
-    var tmp = p.split(token);
-    var val = 0;
-    
-    for (var i = 0; i < puzzleLength; i++)
-    {
-        val = parseInt(tmp[i]);
-        
-        if (isNaN(val) == true)
-            puzzle[i] = noValue;
-        else
-            puzzle[i] = val;
-        
-    }
-    
-    // Explicit garbage collection
-    delete tmp;
     
     updateMap();
 }
@@ -264,12 +438,13 @@ function updateMap()
 {
     var t0 = new Date();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    var ind = -1, len = 0;
+    var ind = -1, len = 0, puzzle = currentPuzzle.puzzle, val = 0;
     for (var y = puzzleHeight - 1; y >= 0; y--)
     {
         for (var x = puzzleWidth - 1; x >= 0; x--)
         {
             ind = x + y * puzzleWidth;
+            val = puzzle[ind];
             
             if (ind == hilightIndex)
             {
@@ -283,10 +458,10 @@ function updateMap()
             ctx.strokeRect(border + x * (squareSize + gap),
                 border + y * (squareSize + gap), squareSize, squareSize);
             
-            if (puzzle[ind] == noValue) continue;
+            if (val == noValue) continue;
             
-            len = ctx.measureText(puzzle[ind]).width;
-            ctx.fillText(puzzle[ind],
+            len = ctx.measureText(val).width;
+            ctx.fillText(val,
                 border + x * (squareSize + gap) + len + 2,
                 border + y * (squareSize + gap) + (squareSize >> 1) + 6);
         }
@@ -301,6 +476,8 @@ function updateSquare(x,y)
     
     if (ind < 0 || ind >= puzzleLength || x < 0 || x >= puzzleWidth)
         return false;
+    
+    var val = currentPuzzle.puzzle[ind];
     
     // The +/- 1 here is to compensate for the way antialiasing happens on
     // OS X webkit
@@ -320,10 +497,10 @@ function updateSquare(x,y)
     ctx.strokeRect(border + x * (squareSize + gap),
         border + y * (squareSize + gap), squareSize, squareSize);
     
-    if (puzzle[ind] == noValue) return true;
+    if (val == noValue) return true;
     
-    var len = ctx.measureText(puzzle[ind]).width;
-    ctx.fillText(puzzle[ind],
+    var len = ctx.measureText(val).width;
+    ctx.fillText(val,
         border + x * (squareSize + gap) + len + 2,
         border + y * (squareSize + gap) + (squareSize >> 1) + 6);
     
@@ -376,45 +553,3 @@ function mouseHandler(evt)
     return false;
 }
 
-function rowUnique(val, row)
-{
-    var max = puzzleWidth * row + puzzleWidth;
-    for (var i = puzzleWidth * row; i < max; i++)
-        if (puzzle[i] == val) return i;
-    return -1;
-}
-
-function columnUnique(val, column)
-{
-    for (var i = puzzleHeight - 1; i >= 0; i--)
-        if (puzzle[i * puzzleWidth + column] == val)
-            return (i * puzzleWidth + column);
-    
-    return -1;
-}
-
-function regionUnique(val, region)
-{
-    // Regions are numbered from left to right, top to bottom, 0 - 8
-    var xstart = region % regionsWide;
-    
-    var startIndex = xstart * regionWidth;
-    startIndex += ((region - xstart) / regionsHigh)*(puzzleWidth * regionsHigh);
-    
-    var max = startIndex + regionWidth;
-    for (var i = startIndex; i < max; i++)
-        if (puzzle[i] == val) return i;
-    
-    startIndex += puzzleWidth;
-    max = startIndex + regionWidth;
-    for (var i = startIndex; i < max; i++)
-        if (puzzle[i] == val) return i;
-    
-    startIndex += puzzleWidth;
-    max = startIndex + regionWidth;
-    for (var i = startIndex; i < max; i++)
-        if (puzzle[i] == val) return i;
-    
-    // Not found
-    return -1;
-}
