@@ -228,6 +228,9 @@ function init()
     loadPuzzles();
     
     resetPuzzle(puzzles["puz-100"], " ", 9, 9);
+    
+    selectionIndex = rowUnique(9,8);
+    updateMap();
 }
 
 function resetPuzzle(p, token)
@@ -375,12 +378,19 @@ function mouseHandler(evt)
 
 function rowUnique(val, row)
 {
-    
+    var max = puzzleWidth * row + puzzleWidth;
+    for (var i = puzzleWidth * row; i < max; i++)
+        if (puzzle[i] == val) return i;
+    return -1;
 }
 
 function columnUnique(val, column)
 {
+    for (var i = puzzleHeight - 1; i >= 0; i--)
+        if (puzzle[i * puzzleWidth + column] == val)
+            return (i * puzzleWidth + column);
     
+    return -1;
 }
 
 function regionUnique(val, region)
