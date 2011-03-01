@@ -472,7 +472,7 @@ SudokuPuzzle.prototype =
     
 }
 
-function backtrackingSearch (p)
+function backtrackingSearch (p, i)
 {
 
 this.guesses = 0;
@@ -485,6 +485,7 @@ var puzzle = p.puzzle,
     regionDomain = p.regionDomain;
 
 var selectUnassignedVariable = (mrvCheck.checked == true ? mrv : first);
+var inf = i;
 
 // ECMAScript is broken as implemented, so do this hack:
 var self = this;
@@ -562,19 +563,19 @@ function nextDomainValue(x)
 function backtrack (p)
 {
     // If the puzzle is complete, return
-    if (p.emptyValues == 0) return p;
+    if (p.emptyValues == 0) return true;
     
     var values, index, value, x;
     
     // Select an unassigened variable.  By default, choose the first
     {
         var ret = selectUnassignedVariable();
+        if (ret == null || ret.values.length < 1) return false;
         index = ret.index;
         values = ret.values;
     }
     
-    // record guesses
-    self.guesses = self.guesses + values.length - 1;
+    self.guesses += values.length - 1;
     
     // For each value in domain values.  It's over if we find even
     for (var i = values.length - 1; i >= 0; i--)
@@ -586,7 +587,7 @@ function backtrack (p)
         if (p.placeValue(value, x, (index - x) / puzzleWidth) == true)
         {
             // Add inferences to assignment
-            if (infer() != false)
+            if (infer(inf) != false)
                 if (backtrack(p) != false)
                     return true;
             
@@ -597,8 +598,15 @@ function backtrack (p)
     return false;
 }
 
-function infer()
+function infer(i)
 {
+    // Have the ability to turn off inference
+    if (i == false) return true;
+    
+    if (p.emptyValues == 0) return true;
+    
+    // AC-3 does nothing here because of how checkForRemainingValues() works
+    
     return true;
 }
 
@@ -609,7 +617,7 @@ function initCanvas()
     // Get the canvas element to display the game in.
     canvas = document.getElementById('display');
     canvas.width = document.body.offsetWidth;
-    canvas.height = window.innerHeight - 120;
+    canvas.height = window.innerHeight - 150;
     
     // Get graphics contexts for the canvas elements
     ctx = canvas.getContext("2d");
@@ -640,7 +648,7 @@ function solvePuzzle(t)
     resetPuzzle(puzzles[t], " ");
     
     t0 = new Date();
-    var result = new backtrackingSearch(currentPuzzle);
+    var result = new backtrackingSearch(currentPuzzle, true);
     t1 = new Date();
     
     document.getElementById('time').innerHTML = 
