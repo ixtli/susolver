@@ -20,6 +20,7 @@ const regionWidth = puzzleWidth / regionsWide;
 const regionHeight = puzzleHeight / regionsHigh;
 const puzzleLength = puzzleWidth * puzzleHeight;
 const numberMax = 9;
+const numberMin = 1;
 
 var selectionIndex = 0;
 var hilightIndex = 0;
@@ -28,6 +29,11 @@ const noValue = -1;
 
 var puzzles = [];
 var currentPuzzle = null;
+
+function genRegion(x,y)
+{
+    return Math.floor(x/regionsWide) + Math.floor(y/regionHeight) * regionsWide;
+}
 
 function loadPuzzles ()
 {
@@ -217,11 +223,16 @@ function SudokuPuzzle (p, token)
     this.rowDomain = new Array(puzzleHeight);
     this.regionDomain = new Array(regionsWide * regionsHigh);
     
+    this.emptyValues = puzzleLength;
+    
     return this.init(p, token);
 }
 
 SudokuPuzzle.prototype = {
     
+    // make-sudoku-puzzle
+    // Note that I couldn't name a function this because you shouldn't be
+    // allowed to use - in a symbol name ever for any reason period.
     init: function (p, token)
     {
         var puzzle = this.puzzle;
@@ -244,41 +255,26 @@ SudokuPuzzle.prototype = {
         // Init column domains
         var obj = this.columnDomain;
         for (var i = obj.length - 1; i >= 0; i--)
-        {
-            obj[i] = new Array(numberMax);
-            val = obj[i];
-            for (var j = 8; j >= 0; j--)
-                val[j] = j + 1;
-        }
+            obj[i] = 0;
         
         // Init row domains
         var obj = this.rowDomain;
         for (var i = obj.length - 1; i >= 0; i--)
-        {
-            obj[i] = new Array(numberMax);
-            val = obj[i];
-            for (var j = 8; j >= 0; j--)
-                val[j] = j + 1;
-        }
+            obj[i] = 0;
         
         // Init region domains
-        var obj = this.columnDomain;
+        var obj = this.regionDomain;
         for (var i = obj.length - 1; i >= 0; i--)
-        {
-            obj[i] = new Array(numberMax);
-            val = obj[i];
-            for (var j = 8; j >= 0; j--)
-                val[j] = j + 1;
-        }
+            obj[i] = 0;
         
+        var x, y;
         for (var i = 0; i < puzzleLength; i++)
         {
             val = parseInt(tmp[i]);
+            x = i % puzzleWidth;
+            y = (i - x) / puzzleWidth;
             
-            if (isNaN(val) == true)
-                puzzle[i] = noValue;
-            else
-                puzzle[i] = val;
+            this.placeValue( isNaN(val) == true ? noValue : val, x, y );
         }
         
         // Explicit garbage collection
@@ -289,17 +285,84 @@ SudokuPuzzle.prototype = {
     
     placeValue: function (val, x, y)
     {
+        // Place val at x, y using state
         
+        if (val > numberMax) return false;
+        if (x > puzzleWidth - 1 || x < 0) return false;
+        if (y > puzzleHeight - 1 || y < 0) return false;
+        
+        // If consistencyCheck is true, then use the stateless version
+        // which checks each row, column, and region to validate the state
+        //if (consistencyCheck == true)
+        //    return this.statelessPlaceValue(val, x, y, consistencyCheck);
+        
+        if (val < numberMin)
+            return this.clear(x,y);
+        else
+            return this.set(val, x, y);
+    },
+    
+    set: function (val, x, y)
+    {
+        // set val at x, y and update state
+        var ind = x + y * puzzleWidth;
+        var p = this.puzzle;
+        var region = genRegion(x,y);
+        
+        // Don't allow overwriting values
+        if (p[ind] != noValue) return false;
+        
+        if (this.rowUnique(val, y) == false)
+            return false;
+        if (this.columnUnique(val, x) == false)
+            return false;
+        if (this.regionUnique(val, region) == false)
+            return false;
+        
+        // update state
+        this.rowDomain[y] |= 1 << val - 1;
+        this.columnDomain[x] |= 1 << val - 1;
+        this.regionDomain[region] |= 1 << val - 1;
+        
+        p[ind] = val;
+        this.emptyValues--;
+        
+        // redraw map
+        // updateSquare(x,y);
+        
+        return true;
+    },
+    
+    clear: function (x, y)
+    {
+        // clear value at x, y and add the value back to the domains
+        var ind = x + y * puzzleWidth;
+        var p = this.puzzle;
+        var region = genRegion(x,y);
+        
+        var oldVal = p[ind];
+        if (oldVal == noValue) return true;
+        
+        this.rowDomain[y] ^= 1 << (oldVal - 1);
+        this.columnDomain[x] ^= 1 << (oldVal - 1);
+        this.regionDomain[region] ^= 1 << (oldVal - 1);
+        
+        // update state
+        p[ind] = noValue;
+        this.emptyValues++;
+        
+        // redraw map
+        // updateSquare(x,y);
+        
+        return true;
     },
     
     statelessPlaceValue: function (val, x, y, checkState)
     {
         if (this.statelessRowUnique(val, y) > noValue) return noValue;
         if (this.statelessColumnUnique(val, x) > noValue) return noValue;
-        
-        var region = x % regionWidth;
-        region += (y % regionHeight) * regionWidth;
-        if (this.statelessRegionUnique(val, region) > noValue) return noValue;
+        if (this.statelessRegionUnique(val, genRegion(x,y)) > noValue)
+            return noValue;
         
         if (checkState == true)
         {
@@ -308,44 +371,41 @@ SudokuPuzzle.prototype = {
             if (this.rowUnique(val, y) == false)
             {
                 if (console.log != "undefined") console.log("Inconsistency");
-                return false;
+                return noValue;
             }
             
             if (this.columnUnique(val, x) == false)
             {
                 if (console.log != "undefined") console.log("Inconsistency");
-                return false;
+                return noValue;
             }
             
-            if (this.regionUnique(val, region) == false)
+            if (this.regionUnique(val, genRegion(x,y)) == false)
             {
                 if (console.log != "undefined") console.log("Inconsistency");
-                return false;
+                return noValue;
             }
         }
         
-        this.puzzle[x + y * puzzleWidth] = val;
-        updateSquare(x,y);
+        this.set(val, x, y);
         
         return true;
     },
     
     rowUnique: function (val, row)
     {
-        
-        return true;
+        // check that val isn't in row
+        return (this.rowDomain[row] & (1 << val - 1) )== 0 ? true : false;
     },
     
     columnUnique: function (val, column)
     {
-        
-        return true;
+        return (this.columnDomain[column] & (1 << val - 1)) == 0 ? true : false;
     },
     
     regionUnique: function (val, region)
     {
-        
-        return true;
+        return (this.regionDomain[region] & (1 << val - 1)) == 0 ? true : false;
     },
     
     statelessRowUnique: function (val, row)
@@ -375,7 +435,8 @@ SudokuPuzzle.prototype = {
         var xstart = region % regionsWide;
         
         var startIndex = xstart * regionWidth;
-        startIndex += ((region - xstart) / regionsHigh)*(puzzleWidth * regionsHigh);
+        startIndex += ((region - xstart) / regionsHigh) * 
+            (puzzleWidth * regionsHigh);
         
         var max = startIndex + regionWidth;
         for (var i = startIndex; i < max; i++)
@@ -397,12 +458,111 @@ SudokuPuzzle.prototype = {
     
 }
 
-function init()
+function backtrackingSearch (p)
+{
+
+if (p == null) return false;
+
+var puzzle = p.puzzle,
+    rDomain = p.rowDomain,
+    cDomain = p.columnDomain,
+    regionDomain = p.regionDomain;
+
+function checkForRemainingValues(ind)
+{
+    var x = ind % puzzleWidth;
+    var y = (ind - x) / puzzleWidth;
+    var r = genRegion(x,y);
+    
+    x = cDomain[x];
+    y = rDomain[y];
+    r = regionDomain[r];
+    
+    // Quick out if any are full
+    if (r == 0x1FF) return [];
+    if (y == 0x1FF) return [];
+    if (x == 0x1FF) return [];
+    
+    // Check to see if any have anything in common
+    var val, res = [];
+    for (var i = 8; i >= 0; i--)
+    {
+        val = 0;
+        val += (r & (1 << i));
+        val += (y & (1 << i));
+        val += (x & (1 << i));
+        
+        if (val == 0) res.push(i+1);
+    }
+    
+    return res;
+}
+
+function firstUnassignedVariable()
+{
+    for (var i = puzzleLength - 1; i >= 0; i--)
+        if (puzzle[i] == noValue)
+            return i;
+    
+    return null;
+}
+
+function nextDomainValue(x)
+{
+    for (var i = 9; i > 0; i--)
+        if ((rDomain[x] & (1 << (i - 1))) == 0)
+            return i;
+    
+    return noValue;
+}
+
+function backtrack (p)
+{
+    // If the puzzle is complete, return
+    if (p.emptyValues == 0) return p;
+    
+    // Select an unassigened variable.  By default, choose the first
+    var index = firstUnassignedVariable();
+    
+    // For each value in domain values.  It's over if we find even
+    var values = checkForRemainingValues(index);
+    var value, x;
+    //console.log("index " + index + " : " + values);
+    for (var i = values.length - 1; i >= 0; i--)
+    {
+        value = values[i];
+        x = index % puzzleWidth;
+        
+        // Assert this assignment
+        if (p.placeValue(value, x, (index - x) / puzzleWidth) == true)
+        {
+            // Add inferences to assignment
+            if (infer() != false)
+                if (backtrack(p) != false)
+                    return true;
+            
+            p.placeValue(noValue, x, (index - x) / puzzleWidth);
+        }
+    }
+    
+    return false;
+}
+
+function infer()
+{
+    return true;
+}
+
+backtrack(p);
+
+}
+
+function initCanvas()
 {
     // Get the canvas element to display the game in.
     canvas = document.getElementById('display');
     canvas.width = document.body.offsetWidth;
-    canvas.height = window.innerHeight - 10;
+    canvas.height = window.innerHeight - 20;
     
     // Get graphics contexts for the canvas elements
     ctx = canvas.getContext("2d");
@@ -410,15 +570,29 @@ function init()
     ctx.lineWidth = 1;
     ctx.fillStyle = "black";
     ctx.font = "12pt sans-serif";
+}
+
+function init()
+{
+    initCanvas();
+    
+    var t0 = new Date();
+    loadPuzzles();
+    resetPuzzle(puzzles["puz-099"], " ");
+    var t1 = new Date();
+    
+    if (console.log != "undefined")
+        console.log("Setup time: " + (t1-t0) + "ms");
     
     configureEventBindings();
     
-    loadPuzzles();
+    t0 = new Date();
+    var result = new backtrackingSearch(currentPuzzle);
+    t1 = new Date();
     
-    resetPuzzle(puzzles["puz-100"], " ", 9, 9);
+    console.log("Backtrack time: " + (t1-t0) + "ms");
     
-    currentPuzzle.statelessPlaceValue(2,0,0,true);
-    currentPuzzle.statelessPlaceValue(3,3,3,true);
+    updateMap();
 }
 
 function resetPuzzle(p, token)
@@ -436,6 +610,8 @@ function resetPuzzle(p, token)
 
 function updateMap()
 {
+    if (currentPuzzle == null) return false;
+    
     var t0 = new Date();
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     var ind = -1, len = 0, puzzle = currentPuzzle.puzzle, val = 0;
@@ -474,6 +650,7 @@ function updateSquare(x,y)
 {
     var ind = x + y * puzzleWidth;
     
+    if (currentPuzzle == null) return false;
     if (ind < 0 || ind >= puzzleLength || x < 0 || x >= puzzleWidth)
         return false;
     
@@ -512,7 +689,10 @@ function configureEventBindings()
     // Set up click handlers
     window.onmousemove = mouseHandler;
     window.onmousedown = mousedownHandler;
-    window.onresize = init;
+    window.onresize = function () {
+        initCanvas();
+        updateMap();
+    };
 }
 
 function mousedownHandler(evt)
