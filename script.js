@@ -6,6 +6,8 @@ const inner_space = 2;
 
 // HTML5 stuff
 window.onload = init;
+var mrvCheck = null;
+var select = null;
 var canvas = null;
 var ctx = null;
 var mouseX = 0, mouseY = 0;
@@ -37,6 +39,17 @@ function genRegion(x,y)
 
 function loadPuzzles ()
 {
+    puzzles["wikipedia"] =
+"5 3 - - 7 - - - - \
+6 - - 1 9 5 - - - \
+- 9 8 - - - - 6 - \
+8 - - - 6 - - - 3 \
+4 - - 8 - 3 - - 1 \
+7 - - - 2 - - - 6 \
+- 6 - - - - 2 8 - \
+- - - 4 1 9 - - 5 \
+- - - - 8 - - 7 9";
+
     puzzles["puz-001"] = 
 "7 8 1 6 - 2 9 - 5 \
 9 - 2 7 1 - - - - \
@@ -228,7 +241,8 @@ function SudokuPuzzle (p, token)
     return this.init(p, token);
 }
 
-SudokuPuzzle.prototype = {
+SudokuPuzzle.prototype =
+{
     
     // make-sudoku-puzzle
     // Note that I couldn't name a function this because you shouldn't be
@@ -461,12 +475,21 @@ SudokuPuzzle.prototype = {
 function backtrackingSearch (p)
 {
 
+this.guesses = 0;
+
 if (p == null) return false;
 
 var puzzle = p.puzzle,
     rDomain = p.rowDomain,
     cDomain = p.columnDomain,
     regionDomain = p.regionDomain;
+
+var selectUnassignedVariable = (mrvCheck.checked == true ? mrv : first);
+
+// ECMAScript is broken as implemented, so do this hack:
+var self = this;
+
+backtrack(p);
 
 function checkForRemainingValues(ind)
 {
@@ -498,13 +521,33 @@ function checkForRemainingValues(ind)
     return res;
 }
 
-function firstUnassignedVariable()
+function first()
 {
     for (var i = puzzleLength - 1; i >= 0; i--)
         if (puzzle[i] == noValue)
-            return i;
+            return {index: i, values: checkForRemainingValues(i)};
     
     return null;
+}
+
+function mrv()
+{
+    var ret = null, tmp = 0, min = null;
+    
+    for (var i = puzzleLength - 1; i >= 0; i--)
+    {
+        if (puzzle[i] == noValue)
+        {
+            tmp = checkForRemainingValues(i);
+            if (tmp.length < min || min == null)
+            {
+                ret = {index: i, values: tmp};
+                min = tmp.length;
+            }
+        }
+    }
+    
+    return ret;
 }
 
 function nextDomainValue(x)
@@ -521,13 +564,19 @@ function backtrack (p)
     // If the puzzle is complete, return
     if (p.emptyValues == 0) return p;
     
+    var values, index, value, x;
+    
     // Select an unassigened variable.  By default, choose the first
-    var index = firstUnassignedVariable();
+    {
+        var ret = selectUnassignedVariable();
+        index = ret.index;
+        values = ret.values;
+    }
+    
+    // record guesses
+    self.guesses = self.guesses + values.length - 1;
     
     // For each value in domain values.  It's over if we find even
-    var values = checkForRemainingValues(index);
-    var value, x;
-    //console.log("index " + index + " : " + values);
     for (var i = values.length - 1; i >= 0; i--)
     {
         value = values[i];
@@ -553,8 +602,6 @@ function infer()
     return true;
 }
 
-backtrack(p);
-
 }
 
 function initCanvas()
@@ -562,7 +609,7 @@ function initCanvas()
     // Get the canvas element to display the game in.
     canvas = document.getElementById('display');
     canvas.width = document.body.offsetWidth;
-    canvas.height = window.innerHeight - 20;
+    canvas.height = window.innerHeight - 120;
     
     // Get graphics contexts for the canvas elements
     ctx = canvas.getContext("2d");
@@ -574,23 +621,33 @@ function initCanvas()
 
 function init()
 {
-    initCanvas();
-    
     var t0 = new Date();
     loadPuzzles();
-    resetPuzzle(puzzles["puz-099"], " ");
     var t1 = new Date();
+    
+    initCanvas();
     
     if (console.log != "undefined")
         console.log("Setup time: " + (t1-t0) + "ms");
     
     configureEventBindings();
     
+    solvePuzzle(select.options[select.selectedIndex].value);
+}
+
+function solvePuzzle(t)
+{
+    resetPuzzle(puzzles[t], " ");
+    
     t0 = new Date();
     var result = new backtrackingSearch(currentPuzzle);
     t1 = new Date();
     
-    console.log("Backtrack time: " + (t1-t0) + "ms");
+    document.getElementById('time').innerHTML = 
+        "Backtrack time: " + (t1-t0) + "ms";
+    
+    document.getElementById('guesses').innerHTML = 
+        "Guesses: " + result.guesses;
     
     updateMap();
 }
@@ -604,8 +661,6 @@ function resetPuzzle(p, token)
     
     selectionIndex = 0;
     hilightIndex = 0;
-    
-    updateMap();
 }
 
 function updateMap()
@@ -686,13 +741,38 @@ function updateSquare(x,y)
 
 function configureEventBindings()
 {
-    // Set up click handlers
+    mrvCheck = document.getElementById('mrv');
+    select = document.getElementById('list');
+    
     window.onmousemove = mouseHandler;
     window.onmousedown = mousedownHandler;
+    
     window.onresize = function () {
         initCanvas();
         updateMap();
     };
+    
+    select.onchange = function () {
+        solvePuzzle(select.options[select.selectedIndex].value);
+    }
+    
+    mrvCheck.onclick = function () {
+        solvePuzzle(select.options[select.selectedIndex].value);
+    }
+    
+    // Populate list box
+    var opt;
+    for (i in puzzles)
+    {
+        if (puzzles.hasOwnProperty(i))
+        {
+            opt = document.createElement('option');
+            opt.text = i;
+            opt.value = i;
+            select.add(opt, 0);
+        }
+    }
+    
 }
 
 function mousedownHandler(evt)
